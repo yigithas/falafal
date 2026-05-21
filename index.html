@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FalaFal</title>
+    <link rel="icon" type="image/png" href="logo.png">
+
+    <!-- 1. TensorFlow.js Core Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <!-- 2. MobileNet Model Kütüphanesi -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@latest"></script>
+
+    <link rel="stylesheet" href="style.css">
+
+
+
+</head>
+<body>
+    
+    <div class="kapsayici">
+        <a href="#ana_div" style="text-decoration: none; display: block; color: inherit;">
+        <div class="giris_kutusu" >
+        <img src="FALAFAL.png"Banner Görseli" class="banner-resim">
+        </div></a>
+        <div class="form_kutusu" id="ana_div">
+            <form  id="myForm" class="form_yeri">
+                
+                <h1 class="basliklar">İsminizi Giriniz</h1>
+                <label for="type" class="giris" ></label>
+                <input type="text" name="isim"  class="girisler" placeholder="İsim" required name="isim">
+                <br>
+                <h1 class="basliklar">Yaşınızı Giriniz</h1>
+                <label for="type" class="giris"></label>
+                <input type="text" name="yas" id="yasid"  class="girisler" placeholder="Yaş" required>
+                <br>
+                
+                <h1 class="basliklar">Meslek Giriniz</h1>
+                <label for="plan-secimi" class="giris" ></label>
+                <select id="plan-secimi" name="plan-secimi" required>
+                
+                <option value="" disabled selected>Bir Durum Seçin...</option>
+                <option value="ogrenci">Öğrenci</option>
+                <option value="calisan">Çalışan</option>
+                <option value="issiz">İşsiz</option>
+                </select>
+                <br>
+
+                <h1 class="basliklar">Fal Resmi Giriniz:</h1>
+                <label for="gorsel-yukle"></label>
+                <label class="custom-file-upload">
+                <input type="file" id="falResmi" name="gorsel" accept="image/*" required>
+                <img id="resimOnizleme" src="" alt="Önizleme" style="max-width: 300px; display: none;">
+
+                <!-- Dosya seçilince görünecek kısım (Başlangıçta CSS ile gizli) -->
+                <span class="secildi-durumu">
+                <span class="check-icon">✓</span> Görsel Seçildi!
+                </span>
+                
+                </label>
+            
+
+
+
+        </div>
+        <br>
+        <button class="buton" type="submit">
+            Fal Baktır
+        </button>
+
+    </form>
+    </div>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
