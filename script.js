@@ -5,7 +5,6 @@ const durumMesaji = document.getElementById('durumMesaji');
 const ana_div = document.getElementById('ana_div');
 
 let yapayZekaModeli = null;
-let resimYuklendiMu = false;
 
 async function modeliYukle() {
     try {
@@ -24,13 +23,10 @@ modeliYukle();
 falResmiInput.addEventListener('change', function(event) {
     const dosya = event.target.files[0];
     if (dosya) {
-        resimYuklendiMu = false;
         const okuyucu = new FileReader();
         okuyucu.onload = function(e) {
             resimOnizleme.src = e.target.result;
-            resimOnizleme.onload = function() {
-                resimYuklendiMu = true;
-            }
+            resimOnizleme.style.display = "none"; 
         }
         okuyucu.readAsDataURL(dosya);
     }
@@ -44,45 +40,52 @@ myForm.addEventListener('submit', async function(event){
         return;
     }
 
-    if (falResmiInput.files.length === 0 || !resimYuklendiMu) {
+    if (falResmiInput.files.length === 0 || !resimOnizleme.src) {
         alert("Lütfen bir kahve fincanı fotoğrafı yükleyin!");
         return;
     }
 
     if(durumMesaji) durumMesaji.innerText = "Fincanınız yapay zeka tarafından inceleniyor...";
 
-    // B. MobileNet ile Resmi Analiz Etme Kısmı (İPhone / iOS ÇÖZÜMÜ)
+    // B. MobileNet ile Resmi Analiz Etme Kısmı
     let tahminler = [];
-    let gizliCanvas = null;
     
     try {
-        // İPhone Renk Profili (Display P3) Hatasını Çözmek İçin Arka Planda Standart Canvas Oluşturuyoruz
-        gizliCanvas = document.createElement('canvas');
+        // [KRİTİK İOS ADIMI]: İPhone resmin piksellerini çözene kadar JavaScript'i zorunlu bekletiyoruz
+        if ('decode' in resimOnizleme) {
+            await resimOnizleme.decode();
+        }
+
+        // Arka planda steril canvas oluşturma
+        const gizliCanvas = document.createElement('canvas');
         const ctx = gizliCanvas.getContext('2d');
         
-        // Resmi MobileNet'in ideal çalışma boyutu olan 224x224 piksele sıkıştırıyoruz
-        // Bu işlem hem iPhone'un devasa çözünürlüğünü optimize eder hem de renk uzayını sRGB'ye zorlar
         gizliCanvas.width = 224;
         gizliCanvas.height = 224;
         
+        // Resmi canvas'a tam sığacak şekilde çiziyoruz
         ctx.drawImage(resimOnizleme, 0, 0, 224, 224);
         
-        // Yapay zekaya artık doğrudan img elementini değil, sterilize edilmiş canvas'ı veriyoruz
+        // Canvas verisini Tensor'e çevirip MobileNet'e veriyoruz
         const tensorGorsel = tf.browser.fromPixels(gizliCanvas);
         tahminler = await yapayZekaModeli.classify(tensorGorsel);
-        tensorGorsel.dispose(); 
+        tensorGorsel.dispose(); // Belleği temizle
+        
     } catch (hata) {
-        console.error("Canvas işleme hatası, eski yönteme dönülüyor:", hata);
+        console.error("Görsel işleme veya asenkron yükleme hatası:", hata);
+        // Eğer canvas adımı tamamen patlarsa yedek olarak doğrudan img elementini dene
         tahminler = await yapayZekaModeli.classify(resimOnizleme);
     }
     
-    // Kelime haznesini iPhone kameralarının nesneleri eşleştirme etiketlerine göre genişlettik
-    const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice'];
+    // Genişletilmiş kelime haznesi ve esnek olasılık filtresi
+    const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice', 'pitcher', 'vase'];
     let fincanBulunduMu = false;
 
+    console.log("Yapay Zeka Tahminleri:", tahminler); // Bilgisayardan veya konsoldan bakmak istersen gör diye ekledim
+
     tahminler.forEach(tahmin => {
-        // iOS için eşiği 0.08'e çekerek hata payını tamamen sıfırlıyoruz
-        if (tahmin.probability > 0.08) {
+        // İPhone için barajı %5'e indiriyoruz, listedeki kelimelerden biri geçiyorsa kabul et
+        if (tahmin.probability > 0.05) {
             kahveKelimeleri.forEach(kelime => {
                 if (tahmin.className.toLowerCase().includes(kelime)) {
                     fincanBulunduMu = true;
@@ -106,11 +109,6 @@ myForm.addEventListener('submit', async function(event){
         ana_div.innerHTML = ``;
         ana_div.classList.add('aktif');
 
-          /*
-            Yas : 1:(<25) 2:(25:50) 3:(50<)
-            Meslek:  1:(ogrenci) 2:(calisan) 3:(işsiz)
-            Tarz : 1:(aşk) 2:(iş/okul) 3:(Aile) 4:(gelecek) 5:(para) 6:(genel)
-         */
         let yas_enum;
         let meslek_enum;
         if(yas>0 && yas<=25) yas_enum = 1;
@@ -149,7 +147,7 @@ myForm.addEventListener('submit', async function(event){
                     <h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
                     <p class="fal_cumlesi">${ask_yorumu.yorum}</p>
                     <p class="fal_cumlesi">${is_yorumu.yorum}</p>
-                    <p class="fal_cumlesi">${aile_yorumu.yorum}</p>
+                    <p class="fal_cumlesi">${aile_yorumlar.length > 0 ? aile_yorumu.yorum : "Aile hayatında sakin bir dönem seni bekliyor."}</p>
                     <p class="fal_cumlesi">${gelecek_yorumu.yorum}</p>
                     <p class="fal_cumlesi">${para_yorumu.yorum}</p>
                 `;
