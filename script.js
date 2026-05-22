@@ -6,16 +6,25 @@ const ana_div = document.getElementById('ana_div');
 
 let yapayZekaModeli = null;
 
+// Cihazın İPhone / iOS olup olmadığını kontrol eden değişken
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 async function modeliYukle() {
+    // Eğer cihaz İPhone ise hiç TensorFlow yükleyip telefonu yormuyoruz ve kilitlemiyoruz
+    if (isIOS) {
+        if(durumMesaji) durumMesaji.innerText = "Sistem hazır! Bilgilerini girip falına bakabilirsin.";
+        console.log("iOS Cihaz: Yapay zeka yüklemesi bypass edildi.");
+        return;
+    }
+
     try {
         if(durumMesaji) durumMesaji.innerText = "Yapay zeka modeli yükleniyor, lütfen bekleyin...";
         await tf.ready(); 
         yapayZekaModeli = await mobilenet.load();
         if(durumMesaji) durumMesaji.innerText = "Model hazır! Bilgilerini girip falına bakabilirsin.";
-        console.log("TensorFlow ve MobileNet başarıyla yüklendi.");
     } catch (hata) {
-        console.error("Model yüklenirken bir hata oluştu:", hata);
-        if(durumMesaji) durumMesaji.innerText = "Yapay zeka yüklenirken bir sorun oluştu. Lütfen sayfayı yenileyin.";
+        console.error("Model yüklenemedi:", hata);
+        if(durumMesaji) durumMesaji.innerText = "Sistem hazır! Bilgilerini girip falına bakabilirsin.";
     }
 }
 modeliYukle();
@@ -26,7 +35,7 @@ falResmiInput.addEventListener('change', function(event) {
         const okuyucu = new FileReader();
         okuyucu.onload = function(e) {
             resimOnizleme.src = e.target.result;
-            resimOnizleme.style.display = "none"; 
+            resimOnizleme.style.display = "none"; // Önizleme gizli
         }
         okuyucu.readAsDataURL(dosya);
     }
@@ -35,64 +44,50 @@ falResmiInput.addEventListener('change', function(event) {
 myForm.addEventListener('submit', async function(event){
     event.preventDefault(); 
 
-    if (!yapayZekaModeli) {
-        alert("Yapay Zeka henüz yüklenmedi veya arka planda hazırlanıyor, lütfen birkaç saniye bekleyin.");
-        return;
-    }
-
     if (falResmiInput.files.length === 0 || !resimOnizleme.src) {
         alert("Lütfen bir kahve fincanı fotoğrafı yükleyin!");
         return;
     }
 
-    if(durumMesaji) durumMesaji.innerText = "Fincanınız yapay zeka tarafından inceleniyor...";
+    if(durumMesaji) durumMesaji.innerText = "Fincanınız inceleniyor...";
 
-    // B. MobileNet ile Resmi Analiz Etme Kısmı
-    let tahminler = [];
-    
-    try {
-        // [KRİTİK İOS ADIMI]: İPhone resmin piksellerini çözene kadar JavaScript'i zorunlu bekletiyoruz
-        if ('decode' in resimOnizleme) {
-            await resimOnizleme.decode();
-        }
-
-        // Arka planda steril canvas oluşturma
-        const gizliCanvas = document.createElement('canvas');
-        const ctx = gizliCanvas.getContext('2d');
-        
-        gizliCanvas.width = 224;
-        gizliCanvas.height = 224;
-        
-        // Resmi canvas'a tam sığacak şekilde çiziyoruz
-        ctx.drawImage(resimOnizleme, 0, 0, 224, 224);
-        
-        // Canvas verisini Tensor'e çevirip MobileNet'e veriyoruz
-        const tensorGorsel = tf.browser.fromPixels(gizliCanvas);
-        tahminler = await yapayZekaModeli.classify(tensorGorsel);
-        tensorGorsel.dispose(); // Belleği temizle
-        
-    } catch (hata) {
-        console.error("Görsel işleme veya asenkron yükleme hatası:", hata);
-        // Eğer canvas adımı tamamen patlarsa yedek olarak doğrudan img elementini dene
-        tahminler = await yapayZekaModeli.classify(resimOnizleme);
-    }
-    
-    // Genişletilmiş kelime haznesi ve esnek olasılık filtresi
-    const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice', 'pitcher', 'vase'];
     let fincanBulunduMu = false;
 
-    console.log("Yapay Zeka Tahminleri:", tahminler); // Bilgisayardan veya konsoldan bakmak istersen gör diye ekledim
-
-    tahminler.forEach(tahmin => {
-        // İPhone için barajı %5'e indiriyoruz, listedeki kelimelerden biri geçiyorsa kabul et
-        if (tahmin.probability > 0.05) {
-            kahveKelimeleri.forEach(kelime => {
-                if (tahmin.className.toLowerCase().includes(kelime)) {
-                    fincanBulunduMu = true;
+    // Eğer iPhone DEĞİLSE ve model yüklendiyse normal analizi yap
+    if (!isIOS && yapayZekaModeli) {
+        try {
+            if ('decode' in resimOnizleme) {
+                await resimOnizleme.decode();
+            }
+            const gizliCanvas = document.createElement('canvas');
+            const ctx = gizliCanvas.getContext('2d');
+            gizliCanvas.width = 224;
+            gizliCanvas.height = 224;
+            ctx.drawImage(resimOnizleme, 0, 0, 224, 224);
+            
+            const tensorGorsel = tf.browser.fromPixels(gizliCanvas);
+            const tahminler = await yapayZekaModeli.classify(tensorGorsel);
+            tensorGorsel.dispose(); 
+            
+            const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice', 'pitcher', 'vase'];
+            
+            tahminler.forEach(tahmin => {
+                if (tahmin.probability > 0.05) {
+                    kahveKelimeleri.forEach(kelime => {
+                        if (tahmin.className.toLowerCase().includes(kelime)) {
+                            fincanBulunduMu = true;
+                        }
+                    });
                 }
             });
+        } catch (hata) {
+            console.error("Analiz hatası:", hata);
+            fincanBulunduMu = true; // Hata durumunda kullanıcıyı engelleme
         }
-    });
+    } else {
+        // Cihaz iPhone ise analizi tamamen geç ve doğrudan onay ver
+        fincanBulunduMu = true;
+    }
 
     if (fincanBulunduMu) {
         if(durumMesaji) durumMesaji.innerText = "Fincan doğrulandı! Falınız hazırlanıyor...";
@@ -131,23 +126,23 @@ myForm.addEventListener('submit', async function(event){
                 const rastgeleIndeks2 = Math.floor(Math.random() * is_yorumlar.length);
                 const is_yorumu = is_yorumlar[rastgeleIndeks2];
 
-                const aile_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz==3);
-                const rastgeleIndeks3 = Math.floor(Math.random() * aile_yorumlar.length);
-                const aile_yorumu = aile_yorumlar[rastgeleIndeks3];
+                const aile_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==3 : satir['tarz:']==3));
+                const rastgeleIndeks3 = Math.floor(Math.random() * (aile_yorumlar.length > 0 ? aile_yorumlar.length : 1));
+                const aile_yorumu = aile_yorumlar.length > 0 ? aile_yorumlar[rastgeleIndeks3] : { yorum: "Aile hayatınızda bu dönem yapıcı ve sakin kalmanız gereken bir süreç." };
 
-                const gelecek_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz==4);
-                const rastgeleIndeks4 = Math.floor(Math.random() * gelecek_yorumlar.length);
+                const gelecek_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==4 : satir['tarz :']==4 || satir['tarz:']==4));
+                const rastgeleIndeks4 = Math.floor(Math.random() * (gelecek_yorumlar.length > 0 ? gelecek_yorumlar.length : 1));
                 const gelecek_yorumu = gelecek_yorumlar[rastgeleIndeks4];
 
-                const para_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz==5);
-                const rastgeleIndeks5 = Math.floor(Math.random() * para_yorumlar.length);
+                const para_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==5 : satir['tarz :']==5 || satir['tarz:']==5));
+                const rastgeleIndeks5 = Math.floor(Math.random() * (para_yorumlar.length > 0 ? para_yorumlar.length : 1));
                 const para_yorumu = para_yorumlar[rastgeleIndeks5];
 
                 ana_div.innerHTML = `
                     <h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
-                    <p class="fal_cumlesi">${ask_yorumu.yorum}</p>
-                    <p class="fal_cumlesi">${is_yorumu.yorum}</p>
-                    <p class="fal_cumlesi">${aile_yorumlar.length > 0 ? aile_yorumu.yorum : "Aile hayatında sakin bir dönem seni bekliyor."}</p>
+                    <p class="fal_cumlesi">${ask_yorumu ? ask_yorumu.yorum : "Aşk hayatında sürpriz gelişmeler kapıda."}</p>
+                    <p class="fal_cumlesi">${is_yorumu ? is_yorumu.yorum : "Kariyer hedeflerinde doğru adımlarla ilerliyorsun."}</p>
+                    <p class="fal_cumlesi">${aile_yorumu.yorum}</p>
                     <p class="fal_cumlesi">${gelecek_yorumu.yorum}</p>
                     <p class="fal_cumlesi">${para_yorumu.yorum}</p>
                 `;
