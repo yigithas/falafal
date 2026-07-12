@@ -3,7 +3,7 @@ html{
 }
 
 body{
-    background-image: url(arkaplan.jpg);
+    background-image: url(../img/arkaplan.jpg);
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;           
@@ -78,6 +78,7 @@ body{
     transform: translateY(-3px); 
     box-shadow: 0 10px 20px rgba(99, 102, 241, 0.5);
 }
+
 
 .banner-resim {
             width: 100%;         
@@ -296,4 +297,14 @@ body{
     word-break: break-word;     
     }
 
+}
+
+.yuklemeMesaji{
+    font-family: 'Times New Roman', Times, serif;
+    color: aliceblue;
+    font-style: italic;
+    font-size: x-large;
+    text-decoration: solid;
+    text-shadow: #6366f1;
+    
 }

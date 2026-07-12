@@ -101,9 +101,10 @@ myForm.addEventListener('submit', async function(event){
         }
         const planSecimi = document.getElementById('plan-secimi').value;
         
-        ana_div.innerHTML = ``;
+        ana_div.innerHTML = `<p class="yuklemeMesaji">Yükleniyor...</p>`;
         ana_div.classList.add('aktif');
 
+        setTimeout(function() {
         let yas_enum;
         let meslek_enum;
         if(yas>0 && yas<=25) yas_enum = 1;
@@ -152,7 +153,8 @@ myForm.addEventListener('submit', async function(event){
             }
         }
         jsondanRastgeleVeriCek();
-
+        }, 3000);
+        
     } else {
         if(durumMesaji) durumMesaji.innerText = "Hata: Bu resim bir kahve fincanına benzemiyor. Lütfen tekrar deneyin.";
         alert("Yüklediğiniz resimde kahve fincanı tespit edilemedi.");
