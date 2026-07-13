@@ -1,19 +1,16 @@
-const myForm = document.getElementById('myForm');
-const falResmiInput = document.getElementById('falResmi'); 
-const resimOnizleme = document.getElementById('resimOnizleme');
+const falFormu = document.getElementById('myForm');
+const falResmi = document.getElementById('falResmi');
+const ana_div = document.getElementById('ana_div'); 
 const durumMesaji = document.getElementById('durumMesaji'); 
-const ana_div = document.getElementById('ana_div');
 
 let yapayZekaModeli = null;
 
-// Cihazın İPhone / iOS olup olmadığını kontrol eden değişken
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Cihazın iPhone / iOS olup olmadığını kontrol eden güvenli değişken
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && ('ontouchstart' in window);
 
 async function modeliYukle() {
-    // Eğer cihaz İPhone ise hiç TensorFlow yükleyip telefonu yormuyoruz ve kilitlemiyoruz
     if (isIOS) {
         if(durumMesaji) durumMesaji.innerText = "Sistem hazır! Bilgilerini girip falına bakabilirsin.";
-        console.log("iOS Cihaz: Yapay zeka yüklemesi bypass edildi.");
         return;
     }
 
@@ -29,22 +26,25 @@ async function modeliYukle() {
 }
 modeliYukle();
 
-falResmiInput.addEventListener('change', function(event) {
+// Dosya seçildiğinde "Görsel Seçildi!" yazısını tetikliyoruz
+falResmi.addEventListener('change', function(event) {
     const dosya = event.target.files[0];
-    if (dosya) {
-        const okuyucu = new FileReader();
-        okuyucu.onload = function(e) {
-            resimOnizleme.src = e.target.result;
-            resimOnizleme.style.display = "none"; // Önizleme gizli
-        }
-        okuyucu.readAsDataURL(dosya);
+    const secildiDurumu = document.querySelector('.secildi-durumu');
+    if (dosya && secildiDurumu) {
+        secildiDurumu.style.display = "inline-block"; //
     }
 });
 
-myForm.addEventListener('submit', async function(event){
-    event.preventDefault(); 
+falFormu.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    if (falResmiInput.files.length === 0 || !resimOnizleme.src) {
+    // ─── MODEL HAZIRLIK KONTROLÜ ───
+    if (!isIOS && !yapayZekaModeli) {
+        alert("Yapay zeka modeli henüz yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
+        return;
+    }
+
+    if (falResmi.files.length === 0) {
         alert("Lütfen bir kahve fincanı fotoğrafı yükleyin!");
         return;
     }
@@ -52,27 +52,33 @@ myForm.addEventListener('submit', async function(event){
     if(durumMesaji) durumMesaji.innerText = "Fincanınız inceleniyor...";
 
     let fincanBulunduMu = false;
+    const dosya = falResmi.files[0];
 
-    // Eğer iPhone DEĞİLSE ve model yüklendiyse normal analizi yap
-    if (!isIOS && yapayZekaModeli) {
+    // ─── 1. ADIM: TENSORFLOW ANALİZİ (GÜVENLİK KAPISI) ───
+    if (!isIOS && yapayZekaModeli && dosya) {
         try {
-            if ('decode' in resimOnizleme) {
-                await resimOnizleme.decode();
-            }
+            
+            
+            // 🧠 SIHİRLİ DOKUNUŞ: Resmi asenkron olarak tamamen belleğe yüklüyoruz.
+            // Bu sayede "The source image cannot be decoded" hatası %100 engellenir.
+            const sanalGorsel = await sanalGorselYukle(dosya);
+
             const gizliCanvas = document.createElement('canvas');
             const ctx = gizliCanvas.getContext('2d');
             gizliCanvas.width = 224;
             gizliCanvas.height = 224;
-            ctx.drawImage(resimOnizleme, 0, 0, 224, 224);
+            ctx.drawImage(sanalGorsel, 0, 0, 224, 224);
             
             const tensorGorsel = tf.browser.fromPixels(gizliCanvas);
             const tahminler = await yapayZekaModeli.classify(tensorGorsel);
             tensorGorsel.dispose(); 
             
+
             const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice', 'pitcher', 'vase'];
             
             tahminler.forEach(tahmin => {
-                if (tahmin.probability > 0.05) {
+                // Eşiği %25 yaptık
+                if (tahmin.probability > 0.25) { 
                     kahveKelimeleri.forEach(kelime => {
                         if (tahmin.className.toLowerCase().includes(kelime)) {
                             fincanBulunduMu = true;
@@ -81,82 +87,167 @@ myForm.addEventListener('submit', async function(event){
                 }
             });
         } catch (hata) {
-            console.error("Analiz hatası:", hata);
-            fincanBulunduMu = true; // Hata durumunda kullanıcıyı engelleme
+            fincanBulunduMu = true; // Kütüphane çökerse kullanıcıyı engelleme, bypass et
         }
     } else {
-        // Cihaz iPhone ise analizi tamamen geç ve doğrudan onay ver
         fincanBulunduMu = true;
     }
 
-    if (fincanBulunduMu) {
-        if(durumMesaji) durumMesaji.innerText = "Fincan doğrulandı! Falınız hazırlanıyor...";
 
-        const formData = new FormData(myForm);
-        let isim = formData.get('isim');
-        let yas = formData.get('yas');
-        if (!/^\d+$/.test(yas)) {
-            alert("Lütfen yaş alanına sadece sayı giriniz!");
-            return; 
+    // 🛑 KESİN BARİYER: Eğer resim fincan değilse kod BURADA KESİLİR.
+    if (!fincanBulunduMu) {
+        if(durumMesaji) durumMesaji.innerText = "";
+        alert("Resimde fal resmi (kahve fincanı/tabağı) bulunamadı. Lütfen geçerli bir görsel yükleyin!");
+        return; 
+    }
+
+        const buton = document.getElementById('buton');
+        buton.innerText = "Fal Okunuyor...";
+        buton.disabled = true;
+
+    // ─── 2. ADIM: FORM BİLGİLERİNİ ALMA VE HAZIRLAMA ───
+    const formData = new FormData(falFormu);
+    const isim = formData.get('isim');
+    const yas = formData.get('yas');
+
+    if (!/^\d+$/.test(yas)) {
+        alert("Lütfen yaş alanına sadece sayı giriniz!");
+        return; 
+    }
+    
+    const durumSecimi = document.getElementById('plan-secimi');
+    const meslek = durumSecimi.options[durumSecimi.selectedIndex].text;
+
+    const Base64Resim = await resmiBase64eCevir(dosya);
+
+    const prompt = `Adım ${isim}, ${yas} yaşındayım, ${meslek} mesleği ile uğraşıyorum. 
+    Sana bir adet fal görseli gönderdim bu falı tıpkı bir falcı gibi yorumla. Bana ismimle
+    hitap et ve fal yorumun maksimum 3 paragraf büyüklüğünde olsun. Fal yorumu içinde emojiler kullanma.`;
+
+    const istekGovdesi = {
+        promptMetni: prompt,
+        base64Resim: Base64Resim
+    };
+    
+    // ─── 3. ADIM: BACKEND İLETİŞİMİ VE YEREL JSON YEDEK PLANI ───
+    try {
+        if(durumMesaji) durumMesaji.innerText = "Yapay zeka falınızı yorumluyor...";
+
+        const response = await fetch('http://localhost:8080/api/fal-bak', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(istekGovdesi)
+        });
+
+        if(!response.ok){
+            throw new Error(`Sunucu Hatası: ${response.status}`);
         }
-        const planSecimi = document.getElementById('plan-secimi').value;
-        
-        ana_div.innerHTML = `<p class="yuklemeMesaji">Yükleniyor...</p>`;
-        ana_div.classList.add('aktif');
 
-        setTimeout(function() {
+        const data = await response.json();
+        const falYorumu = data.candidates[0].content.parts[0].text;
+
+        if(durumMesaji) durumMesaji.innerText = "";
+
+        ana_div.innerHTML = `<h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
+        <p class="fal_cumlesi">${falYorumu.replace(/\n/g, '<br>')}</p>`;
+
+        buton.disabled = false;
+        buton.innerText = "Fal Baktır";
+
+
+        ana_div.scrollIntoView({ behavior: 'smooth' });
+
+    } catch(e) {
+        
+        if(durumMesaji) durumMesaji.innerText = "Yıldızlar yoğun, yerel bilge devreye giriyor...";
+        
+        const planSecimi = document.getElementById('plan-secimi').value;
         let yas_enum;
         let meslek_enum;
-        if(yas>0 && yas<=25) yas_enum = 1;
-        if(yas<=50 && yas>25) yas_enum = 2;
-        if(yas>50) yas_enum = 3;
+        if(yas > 0 && yas <= 25) yas_enum = 1;
+        if(yas <= 50 && yas > 25) yas_enum = 2;
+        if(yas > 50) yas_enum = 3;
         if(planSecimi == "ogrenci") meslek_enum = 1;
         if(planSecimi == "calisan") meslek_enum = 2;
         if(planSecimi == "issiz") meslek_enum = 3;
-        
-        async function jsondanRastgeleVeriCek() {
-            try {
-                const cevap = await fetch('yorumlar.json');
-                const tumYorumlar = await cevap.json(); 
-                
-                const ask_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz==1);
-                const rastgeleIndeks1 = Math.floor(Math.random() * ask_yorumlar.length);
-                const ask_yorumu = ask_yorumlar[rastgeleIndeks1];
 
-                const is_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz==2);
-                const rastgeleIndeks2 = Math.floor(Math.random() * is_yorumlar.length);
-                const is_yorumu = is_yorumlar[rastgeleIndeks2];
-
-                const aile_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==3 : satir['tarz:']==3));
-                const rastgeleIndeks3 = Math.floor(Math.random() * (aile_yorumlar.length > 0 ? aile_yorumlar.length : 1));
-                const aile_yorumu = aile_yorumlar.length > 0 ? aile_yorumlar[rastgeleIndeks3] : { yorum: "Aile hayatınızda bu dönem yapıcı ve sakin kalmanız gereken bir süreç." };
-
-                const gelecek_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==4 : satir['tarz :']==4 || satir['tarz:']==4));
-                const rastgeleIndeks4 = Math.floor(Math.random() * (gelecek_yorumlar.length > 0 ? gelecek_yorumlar.length : 1));
-                const gelecek_yorumu = gelecek_yorumlar[rastgeleIndeks4];
-
-                const para_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz==5 : satir['tarz :']==5 || satir['tarz:']==5));
-                const rastgeleIndeks5 = Math.floor(Math.random() * (para_yorumlar.length > 0 ? para_yorumlar.length : 1));
-                const para_yorumu = para_yorumlar[rastgeleIndeks5];
-
-                ana_div.innerHTML = `
-                    <h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
-                    <p class="fal_cumlesi">${ask_yorumu ? ask_yorumu.yorum : "Aşk hayatında sürpriz gelişmeler kapıda."}</p>
-                    <p class="fal_cumlesi">${is_yorumu ? is_yorumu.yorum : "Kariyer hedeflerinde doğru adımlarla ilerliyorsun."}</p>
-                    <p class="fal_cumlesi">${aile_yorumu.yorum}</p>
-                    <p class="fal_cumlesi">${gelecek_yorumu.yorum}</p>
-                    <p class="fal_cumlesi">${para_yorumu.yorum}</p>
-                `;
-                
-            } catch (hata) {
-                console.error("JSON okunurken bir hata oluştu:", hata);
-            }
-        }
-        jsondanRastgeleVeriCek();
-        }, 3000);
-        
-    } else {
-        if(durumMesaji) durumMesaji.innerText = "Hata: Bu resim bir kahve fincanına benzemiyor. Lütfen tekrar deneyin.";
-        alert("Yüklediğiniz resimde kahve fincanı tespit edilemedi.");
+        await jsondanRastgeleVeriCek(yas_enum, meslek_enum, isim);
     }
 });
+
+// 🔄 Yardımcı Fonksiyon: Resmi asenkron olarak belleğe hatasız yükler
+function sanalGorselYukle(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            img.onload = () => resolve(img);
+            img.onerror = (err) => reject(err);
+            img.src = e.target.result;
+        };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+    });
+}
+
+async function jsondanRastgeleVeriCek(yas_enum, meslek_enum, isim) {
+    try {
+        const cevap = await fetch('yorumlar.json');
+        const tumYorumlar = await cevap.json(); 
+        
+        const ask_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz == 1);
+        const rastgeleIndeks1 = Math.floor(Math.random() * ask_yorumlar.length);
+        const ask_yorumu = ask_yorumlar[rastgeleIndeks1];
+
+        const is_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && satir.tarz == 2);
+        const rastgeleIndeks2 = Math.floor(Math.random() * is_yorumlar.length);
+        const is_yorumu = is_yorumlar[rastgeleIndeks2];
+
+        const aile_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz == 3 : satir['tarz:'] == 3));
+        const rastgeleIndeks3 = Math.floor(Math.random() * (aile_yorumlar.length > 0 ? aile_yorumlar.length : 1));
+        const aile_yorumu = aile_yorumlar.length > 0 ? aile_yorumlar[rastgeleIndeks3] : { yorum: "Aile hayatınızda bu dönem yapıcı ve sakin kalmanız gereken bir süreç." };
+
+        const gelecek_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz == 4 : satir['tarz :'] == 4 || satir['tarz:'] == 4));
+        const rastgeleIndeks4 = Math.floor(Math.random() * (gelecek_yorumlar.length > 0 ? gelecek_yorumlar.length : 1));
+        const gelecek_yorumu = gelecek_yorumlar[rastgeleIndeks4];
+
+        const para_yorumlar = tumYorumlar.filter(satir => satir.yas == yas_enum && satir.meslek == meslek_enum && ('tarz' in satir ? satir.tarz == 5 : satir['tarz :'] == 5 || satir['tarz:'] == 5));
+        const rastgeleIndeks5 = Math.floor(Math.random() * (para_yorumlar.length > 0 ? para_yorumlar.length : 1));
+        const para_yorumu = para_yorumlar.length > 0 ? para_yorumlar[rastgeleIndeks5] : { yorum: "Maddi konularda harcamalarınıza dikkat etmeniz gereken bir dönem." };
+
+        if(durumMesaji) durumMesaji.innerText = "";
+
+        ana_div.innerHTML = `
+            <h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
+            <p class="fal_cumlesi">${ask_yorumu ? ask_yorumu.yorum : "Aşk hayatında sürpriz gelişmeler kapıda."}</p>
+            <p class="fal_cumlesi">${is_yorumu ? is_yorumu.yorum : "Kariyer hedeflerinde doğru adımlarla ilerliyorsun."}</p>
+            <p class="fal_cumlesi">${aile_yorumu.yorum}</p>
+            <p class="fal_cumlesi">${gelecek_yorumu.yorum}</p>
+            <p class="fal_cumlesi">${para_yorumu.yorum}</p>
+        `;
+        
+        ana_div.scrollIntoView({ behavior: 'smooth' });
+
+        buton.disabled = false;
+        buton.innerText = "Fal Baktır";
+        
+    } catch (hata) {
+        console.error("JSON okunurken bir hata oluştu:", hata);
+        if(durumMesaji) durumMesaji.innerText = "";
+        alert("Sistem şu an meşgul, lütfen daha sonra tekrar deneyiniz.");
+    }
+}
+
+function resmiBase64eCevir(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const safBase64 = reader.result.split(',')[1];
+            resolve(safBase64);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
