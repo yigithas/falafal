@@ -308,3 +308,10 @@ body{
     text-shadow: #6366f1;
     
 }
+
+#gecmisAlan {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* İçindeki tüm geçmiş falları yatayda ortalar */
+    width: 100%;         /* Kapsayıcının genişliğine uyum sağlar */
+}

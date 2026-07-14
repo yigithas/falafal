@@ -5,7 +5,7 @@ const durumMesaji = document.getElementById('durumMesaji');
 
 let yapayZekaModeli = null;
 
-// Cihazın iPhone / iOS olup olmadığını kontrol eden güvenli değişken
+// Cihazın iPhone / iOS olup olmadığını kontrol 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && ('ontouchstart' in window);
 
 async function modeliYukle() {
@@ -26,7 +26,7 @@ async function modeliYukle() {
 }
 modeliYukle();
 
-// Dosya seçildiğinde "Görsel Seçildi!" yazısını tetikliyoruz
+
 falResmi.addEventListener('change', function(event) {
     const dosya = event.target.files[0];
     const secildiDurumu = document.querySelector('.secildi-durumu');
@@ -77,7 +77,7 @@ falFormu.addEventListener('submit', async (e) => {
             const kahveKelimeleri = ['cup', 'mug', 'saucer', 'coffee', 'espresso', 'tableware', 'pottery', 'bowl', 'chalice', 'pitcher', 'vase'];
             
             tahminler.forEach(tahmin => {
-                // Eşiği %25 yaptık
+                
                 if (tahmin.probability > 0.25) { 
                     kahveKelimeleri.forEach(kelime => {
                         if (tahmin.className.toLowerCase().includes(kelime)) {
@@ -94,7 +94,7 @@ falFormu.addEventListener('submit', async (e) => {
     }
 
 
-    // 🛑 KESİN BARİYER: Eğer resim fincan değilse kod BURADA KESİLİR.
+   
     if (!fincanBulunduMu) {
         if(durumMesaji) durumMesaji.innerText = "";
         alert("Resimde fal resmi (kahve fincanı/tabağı) bulunamadı. Lütfen geçerli bir görsel yükleyin!");
@@ -150,8 +150,10 @@ falFormu.addEventListener('submit', async (e) => {
 
         if(durumMesaji) durumMesaji.innerText = "";
 
-        ana_div.innerHTML = `<h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
+        let fal = `<h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
         <p class="fal_cumlesi">${falYorumu.replace(/\n/g, '<br>')}</p>`;
+        ana_div.innerHTML = fal;
+        stroageVeriEkleme(fal);
 
         buton.disabled = false;
         buton.innerText = "Fal Baktır";
@@ -219,7 +221,7 @@ async function jsondanRastgeleVeriCek(yas_enum, meslek_enum, isim) {
 
         if(durumMesaji) durumMesaji.innerText = "";
 
-        ana_div.innerHTML = `
+        let fal =  `
             <h2 class="basliklar"> Merhaba, ${isim} Fal Yorumun</h2>
             <p class="fal_cumlesi">${ask_yorumu ? ask_yorumu.yorum : "Aşk hayatında sürpriz gelişmeler kapıda."}</p>
             <p class="fal_cumlesi">${is_yorumu ? is_yorumu.yorum : "Kariyer hedeflerinde doğru adımlarla ilerliyorsun."}</p>
@@ -227,6 +229,9 @@ async function jsondanRastgeleVeriCek(yas_enum, meslek_enum, isim) {
             <p class="fal_cumlesi">${gelecek_yorumu.yorum}</p>
             <p class="fal_cumlesi">${para_yorumu.yorum}</p>
         `;
+
+        ana_div.innerHTML = fal;
+        stroageVeriEkleme(fal);
         
         ana_div.scrollIntoView({ behavior: 'smooth' });
 
@@ -251,3 +256,82 @@ function resmiBase64eCevir(file) {
         reader.onerror = error => reject(error);
     });
 }
+
+function stroageVeriEkleme(fal){
+    let todos = [];
+    if(localStorage.getItem("todos") === null){
+        todos = [];
+    }
+    else{
+        todos = JSON.parse(localStorage.getItem("todos"));
+    }
+
+    todos.unshift(fal);
+    localStorage.setItem("todos",JSON.stringify(todos));
+    stroageVeriGetirme();
+    
+}
+
+function stroageVeriGetirme(){
+
+    let todos = JSON.parse(localStorage.getItem("todos")) || [];
+    const gecmisAlan = document.getElementById('gecmisAlan');
+    const fal_listele = document.getElementById('fal_listele');
+    const fal_sil = document.getElementById('fal_sil');
+
+    if(gecmisAlan){
+        gecmisAlan.innerHTML="";
+    
+     if(todos!=null && todos.length!=0){
+
+        fal_listele.classList.add('buton');
+        fal_listele.style.display ='block';
+        fal_listele.innerText = 'Geçmiş Falları Lisele';
+        let tiklama_sayisi = 0;
+        fal_listele.addEventListener('click',function(){
+            tiklama_sayisi++;
+            
+            if(tiklama_sayisi % 2 !=0){
+            
+            fal_listele.innerText = 'Geçmiş Falları Kapat';
+            gecmisAlan.innerHTML = "";
+
+            for(let i=0;i<todos.length;i++){
+            const yeniDiv = document.createElement('div');
+            yeniDiv.classList.add('form_kutusu','aktif');
+            yeniDiv.style.alignContent = 'center';
+            yeniDiv.innerHTML = todos[i];
+
+            gecmisAlan.appendChild(yeniDiv);
+                }
+
+            }
+
+            if(tiklama_sayisi % 2 ==0){
+                
+                fal_listele.innerText = 'Geçmiş Falları Göster';
+                gecmisAlan.innerHTML = "";
+                
+            }
+            console.log(tiklama_sayisi);
+        })
+
+        
+        fal_sil.classList.add('buton');
+        fal_sil.style.display='block';
+        fal_sil.innerText = "Fal Geçmişini Temizle";
+        fal_sil.addEventListener('click', function(){
+
+            localStorage.removeItem("todos");
+            fal_listele.style.display = 'none';
+            fal_sil.style.display = 'none'
+            gecmisAlan.innerHTML = "";
+            tiklama_sayisi = 0; 
+            fal_listele.innerText = 'Geçmiş Falları Listele';
+        })
+
+     }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', stroageVeriGetirme);
