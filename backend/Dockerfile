@@ -1,7 +1,10 @@
 # 1. Aşama: Maven ile projeyi derle
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
-COPY . .
+
+# Ana dizinden backend klasöründeki dosyaları kopyala
+COPY backend/ .
+
 RUN mvn clean package -DskipTests
 
 # 2. Aşama: Uygulamayı çalıştır
