@@ -39,10 +39,10 @@ falFormu.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     // ─── MODEL HAZIRLIK KONTROLÜ ───
-   /* if (!isIOS && !yapayZekaModeli) {
+    if (!isIOS && !yapayZekaModeli) {
         alert("Yapay zeka modeli henüz yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
         return;
-    }*/
+    }
 
     if (falResmi.files.length === 0) {
         alert("Lütfen bir kahve fincanı fotoğrafı yükleyin!");
