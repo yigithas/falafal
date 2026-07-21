@@ -30,7 +30,7 @@ myForm.addEventListener('submit', async (e) => {
 async function getDogumGunuYorumu(ay, gun) {
     try {
         
-        const response = await fetch(`http://localhost:8080/api/yorum/list/${gun}/${ay}`);
+        const response = await fetch(`https://falafal-backend.onrender.com/api/yorum/list/${gun}/${ay}`);
 
         
         if (!response.ok) {

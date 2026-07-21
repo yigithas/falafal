@@ -39,10 +39,10 @@ falFormu.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     // ─── MODEL HAZIRLIK KONTROLÜ ───
-    if (!isIOS && !yapayZekaModeli) {
+   /* if (!isIOS && !yapayZekaModeli) {
         alert("Yapay zeka modeli henüz yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
         return;
-    }
+    }*/
 
     if (falResmi.files.length === 0) {
         alert("Lütfen bir kahve fincanı fotoğrafı yükleyin!");
@@ -133,7 +133,7 @@ falFormu.addEventListener('submit', async (e) => {
     try {
         if(durumMesaji) durumMesaji.innerText = "Yapay zeka falınızı yorumluyor...";
 
-        const response = await fetch('http://localhost:8080/api/fal-bak', {
+        const response = await fetch('https://falafal-backend.onrender.com/api/fal-bak', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
